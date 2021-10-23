@@ -142,7 +142,7 @@ class CharRnnLmWrapperSingleton():
     model = CharRnnLm(saved_args, training=False)
     if load_weights:
       if sess is None:
-        sess = tf.Session()
+        sess = tf.compat.v1.Session()
       with sess.as_default():
         tf.global_variables_initializer().run()
         saver = tf.train.Saver(tf.global_variables())

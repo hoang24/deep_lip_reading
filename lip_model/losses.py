@@ -17,7 +17,7 @@ def one_hot_labels_to_sparse(y_true):
   return tf.cast(sparse_labels,tf.int32)
 
 def dense_to_sparse(dense_input):
-  with tf.control_dependencies([tf.assert_integer(dense_input)]):
+  with tf.control_dependencies([tf.compat.v1.assert_integer(dense_input)]):
     idx = tf.where(tf.not_equal(dense_input, 0))
     vals = tf.gather_nd(dense_input, idx)
     shape = tf.cast(tf.shape(dense_input), tf.int64)
