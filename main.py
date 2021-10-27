@@ -14,6 +14,8 @@ from language_model.char_rnn_lm import CharRnnLmWrapperSingleton
 from lip_model.training_graph import TransformerTrainGraph
 from lip_model.inference_graph import TransformerInferenceGraph
 
+tf.compat.v1.disable_eager_execution()
+
 config = load_args()
 
 graph_dict = {
@@ -24,7 +26,7 @@ graph_dict = {
 def evaluate_model():
 
     np.random.seed(config.seed)
-    tf.set_random_seed(config.seed)
+    tf.random.set_seed(config.seed)
 
     val_g, val_epoch_size, chars, sess, val_gen = init_models_and_data(istrain=0)
 
@@ -34,7 +36,7 @@ def evaluate_model():
       try: shutil.rmtree('eval_tb_logs')
       except: pass
       tb_logdir = os.path.join(os.getcwd(), 'eval_tb_logs' , 'val')
-      tb_writer = tf.summary.FileWriter(tb_logdir, sess.graph)
+      tb_writer = tf.compat.v1.summary.FileWriter(tb_logdir, sess.graph)
 
     with sess.as_default():
       for _ in range(config.n_eval_times):
@@ -148,9 +150,9 @@ def init_models_and_data(istrain):
   print ('Done')
 
   os.environ["CUDA_VISIBLE_DEVICES"] = str(config.gpu_id)
-  gpu_options = tf.GPUOptions(allow_growth=True)
-  sess_config = tf.ConfigProto(gpu_options=gpu_options)
-  sess = tf.Session(config=sess_config)
+  gpu_options = tf.compat.v1.GPUOptions(allow_growth=True)
+  sess_config = tf.compat.v1.ConfigProto(gpu_options=gpu_options)
+  sess = tf.compat.v1.Session(config=sess_config)
 
   if config.lm_path:
     # initialize singleton rnn so that RNN tf graph is created first
@@ -165,23 +167,23 @@ def init_models_and_data(istrain):
     TransformerGraphClass.get_model_input_target_shapes_and_types()
 
   go_idx = val_gen.label_vectorizer.char_indices[val_gen.label_vectorizer.go_token]
-  x_val = tf.placeholder(dtypes_in[0], shape=shapes_in[0])
+  x_val = tf.compat.v1.placeholder(dtypes_in[0], shape=shapes_in[0])
   prev_shape = list(shapes_out[0])
   if config.test_aug_times : prev_shape[0] *= config.test_aug_times
-  prev_ph = tf.placeholder(dtypes_out[0], shape=prev_shape)
-  y_ph = tf.placeholder(dtypes_out[0], shape=shapes_out[0])
+  prev_ph = tf.compat.v1.placeholder(dtypes_out[0], shape=prev_shape)
+  y_ph = tf.compat.v1.placeholder(dtypes_out[0], shape=shapes_out[0])
   y_val = [prev_ph, y_ph]
 
   chars = val_gen.label_vectorizer.chars
   val_g = TransformerGraphClass(x_val,
                                 y_val,
                                 is_training=False,
-                                reuse=tf.AUTO_REUSE,
+                                reuse=tf.compat.v1.AUTO_REUSE,
                                 go_token_index=go_idx,
                                 chars=chars)
   print("Validation Graph loaded")
 
-  sess.run(tf.tables_initializer())
+  sess.run(tf.compat.v1.tables_initializer())
 
   load_checkpoints(sess)
 
@@ -199,7 +201,7 @@ def load_checkpoints(sess, var_scopes = ('encoder', 'decoder', 'dense')):
   if config.featurizer:
 
     if checkpoint_path:
-      from tensorflow.contrib.framework.python.framework import checkpoint_utils
+      from tensorflow.python.training import checkpoint_utils
       var_list = checkpoint_utils.list_variables(checkpoint)
       for var in var_list:
         if 'visual_frontend' in var[0]:
@@ -207,17 +209,17 @@ def load_checkpoints(sess, var_scopes = ('encoder', 'decoder', 'dense')):
           break
 
     if not 'visual_frontend' in var_scopes:
-      featurizer_vars = tf.global_variables(scope='visual_frontend')
+      featurizer_vars = tf.compat.v1.global_variables(scope='visual_frontend')
       featurizer_ckpt = tf.train.get_checkpoint_state(config.featurizer_model_path)
       featurizer_vars = [var for var in featurizer_vars if not 'Adam' in var.name]
       tf.train.Saver(featurizer_vars).restore(sess, featurizer_ckpt.model_checkpoint_path)
 
   all_variables = []
   for scope in var_scopes:
-    all_variables += [var for var in tf.global_variables(scope=scope)
+    all_variables += [var for var in tf.compat.v1.global_variables(scope=scope)
                       if not 'Adam' in var.name ]
   if checkpoint_path:
-    tf.train.Saver(all_variables).restore(sess, checkpoint)
+    tf.compat.v1.train.Saver(all_variables).restore(sess, checkpoint)
 
     print("Restored saved model {}!".format(checkpoint))
 

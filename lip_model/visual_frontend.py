@@ -1,6 +1,6 @@
 import tensorflow as tf
-from tensorflow.contrib.keras import backend as K
-from tensorflow.contrib.keras.api.keras import layers
+from tensorflow.keras import backend as K
+from tensorflow.keras import layers
 
 from config import load_args
 from lip_model.preproc_and_aug import resize_no_crop, \
@@ -39,8 +39,8 @@ class VisualFrontend:
       self.aug_out = model = tf.concat( [ no_aug_out,  self.aug_out], 0 )
 
     # spatio-temporal frontend
-    model = tf.contrib.keras.layers.ZeroPadding3D(padding=(2, 3, 3))(model)
-    model = tf.layers.Conv3D(filters = 64,
+    model = tf.keras.layers.ZeroPadding3D(padding=(2, 3, 3))(model)
+    model = tf.compat.v1.layers.Conv3D(filters = 64,
                              kernel_size = (5, 7, 7),
                              strides = [1, 2, 2],
                              padding = 'valid',
@@ -48,8 +48,8 @@ class VisualFrontend:
 
     model = batch_normalization_wrapper(model)
     model = tf.nn.relu(model)
-    model = tf.contrib.keras.layers.ZeroPadding3D(padding=(0, 1, 1))(model)
-    model = tf.layers.MaxPooling3D(pool_size=(1, 3, 3), strides=(1,2,2))(model)
+    model = tf.keras.layers.ZeroPadding3D(padding=(0, 1, 1))(model)
+    model = tf.compat.v1.layers.MaxPooling3D(pool_size=(1, 3, 3), strides=(1,2,2))(model)
 
     # We want to apply the resnet on every timestep, so reshape into a batch of size b*t
     packed_model = temporal_batch_pack(model, input_shape=K.int_shape(model)[1:])

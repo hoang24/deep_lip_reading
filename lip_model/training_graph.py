@@ -26,9 +26,10 @@ class TransformerTrainGraph():
     if config.featurizer:
       vid_inp = x[0] if type(x) is tuple or type(x) is list else x
       istarget = tf.not_equal(vid_inp, 0)
+      tf.to_float = lambda x: tf.cast(x, tf.float32)
       self.padding_mask = tf.to_float(tf.reduce_any(istarget, axis=[2,3,4]))
 
-      with tf.variable_scope('visual_frontend', reuse=reuse):
+      with tf.compat.v1.variable_scope('visual_frontend', reuse=reuse):
         self.visual_frontend = VisualFrontend(vid_inp)
         vid_inp = self.visual_frontend.output
       vid_inp = vid_inp * tf.expand_dims(self.padding_mask,-1)
@@ -58,25 +59,25 @@ class TransformerTrainGraph():
 
     # Encoder
     self.enc = x
-    with tf.variable_scope("encoder", reuse=reuse) as scope:
+    with tf.compat.v1.variable_scope("encoder", reuse=reuse) as scope:
       self.enc = self.encoder_body(self.enc, is_training)
 
     # import ipdb; ipdb.set_trace()
     # Decoder
     self.dec = self.decoder_inputs
 
-    top_scope = tf.get_variable_scope() # this is a hack to be able to use same model
+    top_scope = tf.compat.v1.get_variable_scope() # this is a hack to be able to use same model
     self.chars = chars # needed for decoding with external LM
 
     # --------------- index to char dict for summaries --------------------------------
     if chars is not None:
       keys = tf.constant( np.arange(len(chars)) , dtype=tf.int64)
       values = tf.constant(chars , dtype=tf.string)
-      self.char_table = tf.contrib.lookup.HashTable(
-                      tf.contrib.lookup.KeyValueTensorInitializer(keys, values), '')
+      self.char_table = tf.lookup.StaticHashTable(
+                      tf.lookup.KeyValueTensorInitializer(keys, values), '')
 
 
-    with tf.variable_scope("decoder", reuse=reuse) as scope:
+    with tf.compat.v1.variable_scope("decoder", reuse=reuse) as scope:
       self.dec = self.decoder_body(self.enc, self.dec, is_training, top_scope=top_scope)
       if type(self.dec) == tuple:
         self.preds, self.scores, self.dec = self.dec # Inference graph output
@@ -85,7 +86,7 @@ class TransformerTrainGraph():
 
     if config.tb_eval:
       self.add_tb_summaries()
-    self.tb_sum = tf.summary.merge_all()
+    self.tb_sum = tf.compat.v1.summary.merge_all()
 
   def project_output(self):
     return True
@@ -104,7 +105,7 @@ class TransformerTrainGraph():
     dec = self.decoder_embeddings(dec, is_training)
 
     for i in range(config.num_blocks):
-      with tf.variable_scope("num_blocks_{}".format(i)):
+      with tf.compat.v1.variable_scope("num_blocks_{}".format(i)):
         ## self-attention
         dec, alignmets = multihead_attention(queries=dec,
                                        query_masks=query_masks_dec,
@@ -154,7 +155,7 @@ class TransformerTrainGraph():
     dec += pos
 
     ## Dropout
-    dec = tf.layers.dropout(dec,
+    dec = tf.compat.v1.layers.dropout(dec,
                                  rate=config.dropout_rate,
                                  training=tf.convert_to_tensor(is_training))
     return dec
@@ -194,7 +195,7 @@ class TransformerTrainGraph():
     enc = self.encoder_embeddings(enc, is_training)
 
     for i in range(num_blocks):
-      with tf.variable_scope("num_blocks_{}".format(i)):
+      with tf.compat.v1.variable_scope("num_blocks_{}".format(i)):
         ### Multihead Attention
         enc, alignmets = multihead_attention(queries=enc,
                                        query_masks=query_masks,
@@ -229,13 +230,13 @@ class TransformerTrainGraph():
     feat_dim = shape_list(enc)[-1]
     # if input features are not same size as transformer units, make a linear projection
     if not feat_dim == config.hidden_units:
-      enc = tf.layers.dense(enc, config.hidden_units)
+      enc = tf.compat.v1.layers.dense(enc, config.hidden_units)
 
     enc += self.positional_encoding(enc, scope='enc_pe')
 
     if embed_input:
       ## Dropout
-      enc = tf.layers.dropout(enc,
+      enc = tf.compat.v1.layers.dropout(enc,
                                    rate=config.dropout_rate,
                                    training=tf.convert_to_tensor(is_training))
     return enc
@@ -244,7 +245,7 @@ class TransformerTrainGraph():
     # Final linear projection
     if self.project_output():
       # with tf.variable_scope("ctc_conv1d_net/ctc_probs", reuse=reuse) as scope:
-        self.logits = tf.layers.dense(self.dec, config.n_labels, reuse=reuse)
+        self.logits = tf.compat.v1.layers.dense(self.dec, config.n_labels, reuse=reuse)
     else:
       assert(self.dec.get_shape()[-1].value == config.n_labels)
       self.logits = self.dec
@@ -265,10 +266,10 @@ class TransformerTrainGraph():
 
     # we want to know when to stop so learn padding as well
     self.mean_loss = tf.reduce_sum(self.loss) / (tf.reduce_sum(self.istarget))
-    self.logprobs = tf.log(tf.nn.softmax(self.logits))
+    self.logprobs = tf.math.log(tf.nn.softmax(self.logits))
 
     if not 'infer' in config.graph_type:
-      self.preds = tf.to_int32(tf.argmax(self.logits, axis=-1))
+      self.preds = tf.cast(tf.argmax(self.logits, axis=-1), tf.int32)
       self.cer, self.cer_per_sample = cer(self.y_one_hot, self.logits, return_all=True)
     else:
       self.preds = tf.to_int32(self.preds)
@@ -301,12 +302,12 @@ class TransformerTrainGraph():
 
     # ----------------   Add text summaries -------------------------------
     pred_strings_tf = self.char_table.lookup(tf.cast(self.preds, tf.int64))
-    joined_pred = tf.string_join(
+    joined_pred = tf.compat.v1.string_join(
       tf.split(pred_strings_tf, pred_strings_tf.shape[1], 1))[ :, 0]
     gt_strings_tf = self.char_table.lookup(tf.cast(self.y, tf.int64))
-    joined_gt = tf.string_join(
+    joined_gt = tf.compat.v1.string_join(
       tf.split(gt_strings_tf, pred_strings_tf.shape[1], 1))[:, 0]
-    joined_all = tf.string_join([joined_gt, joined_pred], ' --> ')
+    joined_all = tf.compat.v1.string_join([joined_gt, joined_pred], ' --> ')
     tf.summary.text('Predictions', joined_all)
 
     # ----------------   Add image summaries -------------------------------
@@ -314,7 +315,7 @@ class TransformerTrainGraph():
     for layer_name, alignment_history in self.alignment_history.items():
       for att_head_idx, attention_images in enumerate(alignment_history):
         all_atts.append(attention_images)
-    avg_att = tf.exp(tf.reduce_mean(tf.log(all_atts), axis=0))
+    avg_att = tf.exp(tf.reduce_mean(tf.math.log(all_atts), axis=0))
 
     # Permute and reshape (batch, t_dec, t_enc) --> (batch, t_enc, t_dec, 1)
     attention_img = tf.expand_dims(tf.transpose(avg_att, [0, 2, 1]), -1)

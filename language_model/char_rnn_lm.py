@@ -24,9 +24,8 @@ import os
 
 import tensorflow as tf
 from six.moves import cPickle as pickle
-from tensorflow.contrib import legacy_seq2seq
-from tensorflow.contrib import rnn
-
+from tensorflow.keras.layers import RNN as rnn
+from tensorflow_addons import seq2seq as legacy_seq2seq
 
 class CharRnnLm():
   def __init__(self,

@@ -27,17 +27,17 @@ def normalize(inputs,
     Returns:
       A tensor with the same shape and data dtype as `inputs`.
     '''
-    with tf.variable_scope(scope, reuse=reuse):
+    with tf.compat.v1.variable_scope(scope, reuse=reuse):
         inputs_shape = inputs.get_shape()
         params_shape = inputs_shape[-1:]
     
-        mean, variance = tf.nn.moments(inputs, [-1], keep_dims=True)
+        mean, variance = tf.nn.moments(inputs, [-1], keepdims=True)
         # beta= tf.Variable(tf.zeros(params_shape))
         # gamma = tf.Variable(tf.ones(params_shape))
-        beta = tf.get_variable('beta',
+        beta = tf.compat.v1.get_variable('beta',
                                shape=params_shape,
                                initializer=tf.zeros_initializer)
-        gamma = tf.get_variable('gamma',
+        gamma = tf.compat.v1.get_variable('gamma',
                               shape=params_shape,
                               initializer=tf.ones_initializer)
 
@@ -109,11 +109,11 @@ def embedding(inputs,
       [ 1.22204471 -0.96587461]]]    
     ```    
     '''
-    with tf.variable_scope(scope, reuse=reuse):
-        lookup_table = tf.get_variable('lookup_table',
+    with tf.compat.v1.variable_scope(scope, reuse=reuse):
+        lookup_table = tf.compat.v1.get_variable('lookup_table',
                                        dtype=tf.float32,
                                        shape=[vocab_size, num_units],
-                                       initializer=tf.contrib.layers.xavier_initializer())
+                                       initializer=tf.keras.initializers.glorot_normal())
         if zero_pad:
             lookup_table = tf.concat((tf.zeros(shape=[1, num_units]),
                                       lookup_table[1:, :]), 0)
@@ -152,7 +152,7 @@ def sinusoid_encoding(inputs,
 
     # N, _ = inputs.get_shape().as_list()[:2]
     N = tf.shape(inputs)[0]
-    with tf.variable_scope(scope, reuse=reuse):
+    with tf.compat.v1.variable_scope(scope, reuse=reuse):
         position_ind = tf.tile(tf.expand_dims(tf.range(T), 0), [N, 1])
 
         # First part of the PE function: sin and cos argument
@@ -210,15 +210,15 @@ def multihead_attention(queries,
       A 3d tensor with shape of (N, T_q, C)  
     '''
 
-    with tf.variable_scope(scope, reuse=reuse):
+    with tf.compat.v1.variable_scope(scope, reuse=reuse):
         # Set the fall back option for num_units
         if num_units is None:
             num_units = queries.get_shape().as_list[-1]
 
         # Linear projections
-        Q = tf.layers.dense(queries, num_units, activation=tf.nn.relu) # (N, T_q, C)
-        K = tf.layers.dense(keys, num_units, activation=tf.nn.relu) # (N, T_k, C)
-        V = tf.layers.dense(keys, num_units, activation=tf.nn.relu) # (N, T_k, C)
+        Q = tf.compat.v1.layers.dense(queries, num_units, activation=tf.nn.relu) # (N, T_q, C)
+        K = tf.compat.v1.layers.dense(keys, num_units, activation=tf.nn.relu) # (N, T_k, C)
+        V = tf.compat.v1.layers.dense(keys, num_units, activation=tf.nn.relu) # (N, T_k, C)
 
         if cache is not None:
             K = cache["k"] = tf.concat([cache["k"], K], axis=1)
@@ -276,7 +276,7 @@ def multihead_attention(queries,
           outputs *= query_masks # broadcasting. (N, T_q, C)
           
         # Dropouts
-        outputs = tf.layers.dropout(outputs,
+        outputs = tf.compat.v1.layers.dropout(outputs,
                                     rate=dropout_rate,
                                     training=tf.convert_to_tensor(is_training))
                
@@ -311,16 +311,16 @@ def feedforward(inputs,
     Returns:
       A 3d tensor with the same shape and dtype as inputs
     '''
-    with tf.variable_scope(scope, reuse=reuse):
+    with tf.compat.v1.variable_scope(scope, reuse=reuse):
         # Inner layer
         params = {"inputs": inputs, "filters": num_units[0], "kernel_size": 1,
                   "activation": tf.nn.relu, "use_bias": True}
-        outputs = tf.layers.conv1d(**params)
+        outputs = tf.compat.v1.layers.conv1d(**params)
         
         # Readout layer
         params = {"inputs": outputs, "filters": num_units[1], "kernel_size": 1,
                   "activation": None, "use_bias": True}
-        outputs = tf.layers.conv1d(**params)
+        outputs = tf.compat.v1.layers.conv1d(**params)
         
         # Residual connection
         if add_skip_connection:

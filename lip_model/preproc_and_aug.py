@@ -15,14 +15,14 @@ def wrap_in_training_phase(train_out, test_out, name=None):
 # --- resize ---
 
 def resize_no_crop(vids, new_h, new_w, name=None):
-  resized = tf.map_fn( lambda x: tf.image.resize_images(x, [new_h, new_w]), vids, name=name)
+  resized = tf.map_fn( lambda x: tf.image.resize(x, [new_h, new_w]), vids, name=name)
   return resized
 
 def resize_vids(vids, scale, name=None):
   h,w = vids.shape.as_list()[2:4]
   h_n, w_n = int(scale*h), int(scale*w)
-  resized = tf.map_fn( lambda x: tf.image.resize_images(x, [w_n, h_n]), vids )
-  resized_cropped = tf.map_fn( lambda x: tf.image.resize_image_with_crop_or_pad(x, w, h), resized , name=name)
+  resized = tf.map_fn( lambda x: tf.image.resize(x, [w_n, h_n]), vids )
+  resized_cropped = tf.map_fn( lambda x: tf.image.resize_with_crop_or_pad(x, w, h), resized , name=name)
   return resized_cropped
 
 

@@ -26,4 +26,4 @@ def batch_normalization_wrapper(input_tensor, **kwargs):
   Wrap batch normalization to switch between training and evaluation mode
   """
   training=False # This has been hardcoded for evaluation code - change for training
-  return tf.layers.batch_normalization(input_tensor, training=training, **kwargs)
+  return tf.compat.v1.layers.batch_normalization(input_tensor, training=training, **kwargs)

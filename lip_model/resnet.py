@@ -1,11 +1,11 @@
 from __future__ import division
 
 from util.tf_util import batch_normalization_wrapper
-from tensorflow.contrib.keras import backend as K
+from tensorflow.keras import backend as K
 import tensorflow as tf
 
-kernel_initializer = tf.contrib.keras.initializers.he_normal()
-kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-4)
+kernel_initializer = tf.keras.initializers.he_normal()
+kernel_regularizer = tf.keras.regularizers.L2(1e-4)
 
 ROW_AXIS = 1
 COL_AXIS = 2
@@ -38,10 +38,10 @@ def resnet_18(input_tensor, repetitions=(2, 2, 2, 2)):
 
   # Classifier block
   block_shape = K.int_shape(block)
-  pool2 = tf.layers.AveragePooling2D(pool_size=(block_shape[ROW_AXIS], block_shape[COL_AXIS]),
+  pool2 = tf.compat.v1.layers.AveragePooling2D(pool_size=(block_shape[ROW_AXIS], block_shape[COL_AXIS]),
                            strides=(1, 1))(block)
 
-  flatten1 = tf.layers.Flatten()(pool2)
+  flatten1 = tf.compat.v1.layers.Flatten()(pool2)
 
   return flatten1
 
@@ -80,7 +80,7 @@ def _basic_block(filters, init_strides=(1, 1), is_first_block_of_first_layer=Fal
 
     if is_first_block_of_first_layer:
       # don't repeat bn->relu since we just did bn->relu->maxpool
-      conv1 = tf.layers.conv2d(input, filters=filters, kernel_size=(3, 3), use_bias=False,
+      conv1 = tf.compat.v1.layers.conv2d(input, filters=filters, kernel_size=(3, 3), use_bias=False,
                      strides=init_strides,
                      padding="same",
                      kernel_initializer=kernel_initializer,
@@ -109,7 +109,7 @@ def _shortcut(input, residual):
   shortcut = input
   # 1 X 1 conv if shape is different. Else identity.
   if stride_width > 1 or stride_height > 1 or not equal_channels:
-    shortcut = tf.layers.conv2d(input, filters=residual_shape[CHANNEL_AXIS], use_bias=False,
+    shortcut = tf.compat.v1.layers.conv2d(input, filters=residual_shape[CHANNEL_AXIS], use_bias=False,
                       kernel_size=(1, 1),
                       strides=(stride_width, stride_height),
                       padding="valid",
@@ -123,7 +123,7 @@ def _conv_bn_relu(filters, kernel_size, strides=(1,1), padding='same', kernel_re
   """Helper to build a conv -> BN -> relu block
   """
   def f(input):
-    conv = tf.layers.conv2d(input, filters=filters, kernel_size=kernel_size, use_bias=False,
+    conv = tf.compat.v1.layers.conv2d(input, filters=filters, kernel_size=kernel_size, use_bias=False,
                   strides=strides, padding=padding,
                   kernel_initializer=kernel_initializer,
                   kernel_regularizer=kernel_regularizer)
@@ -139,7 +139,7 @@ def _bn_relu_conv(filters, kernel_size, strides=(1,1), padding='same', kernel_re
 
   def f(input):
     activation = _bn_relu(input)
-    return tf.layers.conv2d(activation, filters=filters, kernel_size=kernel_size, use_bias=False,
+    return tf.compat.v1.layers.conv2d(activation, filters=filters, kernel_size=kernel_size, use_bias=False,
                   strides=strides, padding=padding,
                   kernel_initializer=kernel_initializer,
                   kernel_regularizer=kernel_regularizer)
@@ -161,8 +161,8 @@ def _only_conv(filters, kernel_size, strides=(1,1), padding='same', kernel_regul
   def f(input):
 
     assert strides[0] == 2
-    padded = tf.contrib.keras.layers.ZeroPadding2D(padding=(1, 1))(input)
-    return tf.layers.conv2d(padded, filters=filters, kernel_size=kernel_size, use_bias=False,
+    padded = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(input)
+    return tf.compat.v1.layers.conv2d(padded, filters=filters, kernel_size=kernel_size, use_bias=False,
                   strides=strides, padding='valid',
                   kernel_initializer=kernel_initializer,
                   kernel_regularizer=kernel_regularizer )
