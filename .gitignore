@@ -41,3 +41,5 @@ logs/
 *.png
 *.yml
 *.lprof
+
+*env

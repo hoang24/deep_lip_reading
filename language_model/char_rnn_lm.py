@@ -24,7 +24,7 @@ import os
 
 import tensorflow as tf
 from six.moves import cPickle as pickle
-from tensorflow.keras.layers import RNN as rnn
+# from tensorflow.keras.layers import RNN as rnn
 from tensorflow_addons import seq2seq as legacy_seq2seq
 
 class CharRnnLm():
@@ -44,21 +44,21 @@ class CharRnnLm():
 
       from distutils.version import StrictVersion
       if StrictVersion(tf.__version__) >= StrictVersion('1.5'):
-        cell = tf.nn.rnn_cell.LSTMCell(args.rnn_size, name='basic_lstm_cell')
+        cell = tf.compat.v1.nn.rnn_cell.LSTMCell(args.rnn_size, name='basic_lstm_cell')
       else:
-        cell = tf.nn.rnn_cell.BasicLSTMCell(args.rnn_size)
+        cell = tf.compat.v1.nn.rnn_cell.BasicLSTMCell(args.rnn_size)
       if training and (args.output_keep_prob < 1.0 or args.input_keep_prob < 1.0):
-        cell = rnn.DropoutWrapper(cell,
+        cell = tf.compat.v1.nn.rnn_cell.DropoutWrapper(cell,
                                   input_keep_prob=args.input_keep_prob,
                                   output_keep_prob=args.output_keep_prob)
       cells.append(cell)
 
-    self.cell = cell = rnn.MultiRNNCell(cells, state_is_tuple=True)
+    self.cell = cell = tf.compat.v1.nn.rnn_cell.MultiRNNCell(cells, state_is_tuple=True)
 
     if input_data is None:
-      self.input_data = tf.placeholder(
+      self.input_data = tf.compat.v1.placeholder(
         tf.int32, [args.batch_size, args.seq_length])
-      self.targets = tf.placeholder(
+      self.targets = tf.compat.v1.placeholder(
         tf.int32, [args.batch_size, args.seq_length])
       self.initial_state = cell.zero_state(args.batch_size, tf.float32)
     else:
@@ -66,13 +66,13 @@ class CharRnnLm():
       self.targets = None
       self.initial_state = initial_state
 
-    with tf.variable_scope('rnnlm'):
-      softmax_w = tf.get_variable("softmax_w",
+    with tf.compat.v1.variable_scope('rnnlm'):
+      softmax_w = tf.compat.v1.get_variable("softmax_w",
                                   [args.rnn_size, args.vocab_size])
-      softmax_b = tf.get_variable("softmax_b", [args.vocab_size])
+      softmax_b = tf.compat.v1.get_variable("softmax_b", [args.vocab_size])
 
-    embedding = tf.get_variable("embedding", [args.vocab_size, args.rnn_size])
-    inputs = tf.nn.embedding_lookup(embedding, self.input_data)
+    embedding = tf.compat.v1.get_variable("embedding", [args.vocab_size, args.rnn_size])
+    inputs = tf.compat.v1.nn.embedding_lookup(embedding, self.input_data)
 
     # dropout beta testing: double check which one should affect next line
     if training and args.output_keep_prob:
