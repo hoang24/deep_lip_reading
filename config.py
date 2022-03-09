@@ -13,8 +13,8 @@ def load_args(default_config=None):
   parser.add_argument('--tb_eval', type=bool, default=False, help='Write tb summaries during evaluation')
 
   # Data
-  parser.add_argument('--data_path', type=str, default='media/example', help='Path to the videos')
-  parser.add_argument('--data_list', type=str, default='media/example/demo_list.txt', help='List of (video_path, transcription) entries. Video paths should be relative to --data_path')
+  parser.add_argument('--data_path', type=str, default='media/', help='Path to the videos')
+  parser.add_argument('--data_list', type=str, default='media/demo_list.txt', help='List of (video_path, transcription) entries. Video paths should be relative to --data_path')
 
   parser.add_argument('--batch_size', type=int, default=1, help='Batch size')
 
