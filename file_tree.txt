@@ -1,0 +1,32 @@
+config.py
+
+main.py
+|___data/list_generator.py
+	|___data/label_vectorization.py
+	|___data/load_video.py
+
+|___language_model/char_rnn_lm.py
+
+|___lip_model/training_graph.py
+	|___config.py
+	|___lip_model/losses.py
+	|___lip_model/modules.py
+	|___lip_model/visual_frontend.py
+		|___config.py
+		|___lip_model/prepoc_and_aug.py
+			|___util/tf_util.py
+		|___lip_model/resnet.py
+			|___util/tf_util.py
+		|___util/tf_util.py
+	|___util/tf_util.py
+	|___util/tb_util.py
+
+|___lip_model/inference_graph.py
+	|___config.py
+	|___language_model/char_rnn_lm.py
+	|___lip_model/beam_search.py
+		|___util/tf_util.py
+	|___lip_model.training_graph.py
+		|___*
+	|___lip_model.modules.py
+	|___util/tf_util.py

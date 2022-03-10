@@ -22,90 +22,42 @@ tf.compat.v1.disable_eager_execution()
 config = load_args()
 
 graph_dict = {
-              'train': TransformerTrainGraph,
-              'infer': TransformerInferenceGraph,
-              }
+    'train': TransformerTrainGraph,
+    'infer': TransformerInferenceGraph,
+}
 
 
-def evaluate_model():
-
-    np.random.seed(config.seed)
-    tf.random.set_seed(config.seed)
-
-    val_g, val_epoch_size, chars, sess, val_gen = init_models_and_data(istrain=0)
-
-    tb_writer = None
-    if config.tb_eval:
-        import shutil
-        try: shutil.rmtree('eval_tb_logs')
-        except: pass
-        tb_logdir = os.path.join(os.getcwd(), 'eval_tb_logs' , 'val')
-        tb_writer = tf.compat.v1.summary.FileWriter(tb_logdir, sess.graph)
-
-    with sess.as_default():
-        for _ in range(config.n_eval_times):
-            pred_sentences, val_loss, val_cer, val_wer = validation_loop(sess, val_g,
-                                                                         val_epoch_size,
-                                                                         chars = chars,
-                                                                         val_gen = val_gen,
-                                                                         tb_writer = tb_writer,
-                                                                         )
-
-            out_str = "lm={}, beam={}, bs={:d}, test_aug:{:d}, horflip {}:" \
-                      " CER {:.4f}, WER {:4f}\n".format(config.lm_path,
-                                                        config.beam_size,
-                                                        config.batch_size,
-                                                        config.test_aug_times,
-                                                        config.horizontal_flip,
-                                                        val_cer, val_wer)
-            print(out_str)
-            with open('output.txt', 'a') as fw:
-                fw.write(out_str)
-
-    print("Done")
-    return pred_sentences[0]
-
-
-def validation_loop(sess, g, n_batches, chars=None, val_gen = None, tb_writer=None):
-
-    Loss = []
-    Cer = []
-    Wer = []
-
-    progbar = Progbar(target=n_batches, verbose=1, stateful_metrics=['t'])
-    print ('Starting validation Loop')
-
+def predict(sess, g, n_batches, chars=None, val_gen=None, tb_writer=None):
     for i in range(n_batches):
-
         x, y =  val_gen.next()
         if len(x) == 1: x = x[0]
         if len(y) == 1: y = y[0]
-    
+
         # -- Autoregressive inference
         preds = np.zeros((config.batch_size, config.maxlen), np.int32)
-    
+
         tile_preds = config.test_aug_times
         # -- For train graph feed in the previous step's predictions manually for the next
         if not 'infer' in config.graph_type:
             prev_inp = np.tile(preds, [config.test_aug_times,1]) if tile_preds else preds
             feed_dict = {g.x: x, g.prev: prev_inp, g.y: y}
-    
+
             enc = sess.run( g.enc, feed_dict)
             if type(enc) is list:
                 for enc_tens, enc_val in zip(g.enc, enc): feed_dict[enc_tens] = enc_val
             else:
                 feed_dict[g.enc] = enc
             for j in range(config.maxlen):
-                _preds, loss, cer = sess.run( [g.preds, g.mean_loss, g.cer], feed_dict)
+                _preds, loss, cer = sess.run([g.preds, g.mean_loss, g.cer], feed_dict)
                 preds[:, j] = _preds[:, j]
                 prev_inp = np.tile(preds, [config.test_aug_times,1]) if tile_preds else preds
-                feed_dict[g.prev]=prev_inp
+                feed_dict[g.prev] = prev_inp
                 # if all samples in batch predict the pad symbol (char_id==0)
                 if np.sign(preds[:,j]).sum() == 0:
                     if g.tb_sum is not None:
                         tb_sum = sess.run( g.tb_sum, {g.x: x, g.prev: prev_inp, g.y: y})
                     break
-    
+
         # -- Autoregression loop is built into the beam search graph
         else:
             feed_dict = {g.x: x, g.y: y}
@@ -114,46 +66,20 @@ def validation_loop(sess, g, n_batches, chars=None, val_gen = None, tb_writer=No
                 for enc_tens, enc_val in zip(g.enc, enc): feed_dict[enc_tens] = enc_val
             else:
                 feed_dict[g.enc] = enc
-            _preds, loss, cer = sess.run( [g.preds, g.mean_loss, g.cer], feed_dict)
+            _preds, loss, cer = sess.run([g.preds, g.mean_loss, g.cer], feed_dict)
             preds = _preds
-    
-        # use last loss
-        gt_sents = [ ''.join([ chars[cid] for cid in prr]).strip() for prr in y]
-        gt_words = [ sent.split('-') for sent in gt_sents]
-    
-        def decode_preds_to_chars(decoding):
-            return ''.join([ chars[cid] for cid in decoding]).strip()
-    
-        pred_sentences = [ decode_preds_to_chars(prr) for prr in preds]
-    
-        pred_words = [sent.split('-') for sent in  pred_sentences]
-    
-        edists = [rel_edist(gt, dec_str) for gt, dec_str in zip(gt_words, pred_words)]
-        wer = np.mean(edists)
-    
-        # -- Write tb_summaries if any
-        if g.tb_sum is not None:
-            if wer == 0:
-                tb_writer.add_summary(tb_sum, i)
-    
-        if config.print_predictions:
-            print()
-            for gts, prs, wr in zip(gt_sents, pred_sentences, edists):
-                print ('(wer={:.1f}) {} --> {}'.format(wr*100, gts, prs))
-    
-        progbar.update(i+1, [ ('cer',cer), ('wer', wer) ] )
-        Wer.append(wer)
-    
-        Cer.append(cer)
-        Loss.append(loss)
 
-    return pred_sentences, np.average(Loss), np.average(Cer), np.average(Wer)
+        decode_preds_to_chars = lambda decoding: ''.join([ chars[cid] for cid in decoding]).strip()
+        pred_sentences = [decode_preds_to_chars(prr).replace('-', ' ') for prr in preds]
+        pred_words = [sent.split(' ') for sent in  pred_sentences]
+
+    return pred_sentences, pred_words
 
 
 def init_models_and_data(istrain):
-
     print ('Loading data generators')
-    val_gen, val_epoch_size = setup_generators()
+    val_gen = ListGenerator(data_list=config.data_list)
+    val_epoch_size = val_gen.calc_nbatches_per_epoch()
     print ('Done')
   
     os.environ["CUDA_VISIBLE_DEVICES"] = str(config.gpu_id)
@@ -170,13 +96,13 @@ def init_models_and_data(istrain):
   
     TransformerGraphClass = graph_dict[config.graph_type]
   
-    (shapes_in, dtypes_in), (shapes_out, dtypes_out) = \
-        TransformerGraphClass.get_model_input_target_shapes_and_types()
+    (shapes_in, dtypes_in), (shapes_out, dtypes_out) = TransformerGraphClass.get_model_input_target_shapes_and_types()
   
     go_idx = val_gen.label_vectorizer.char_indices[val_gen.label_vectorizer.go_token]
     x_val = tf.compat.v1.placeholder(dtypes_in[0], shape=shapes_in[0])
     prev_shape = list(shapes_out[0])
-    if config.test_aug_times : prev_shape[0] *= config.test_aug_times
+    if config.test_aug_times:
+        prev_shape[0] *= config.test_aug_times
     prev_ph = tf.compat.v1.placeholder(dtypes_out[0], shape=prev_shape)
     y_ph = tf.compat.v1.placeholder(dtypes_out[0], shape=shapes_out[0])
     y_val = [prev_ph, y_ph]
@@ -232,20 +158,20 @@ def load_checkpoints(sess, var_scopes = ('encoder', 'decoder', 'dense')):
         print("Restored saved model {}!".format(checkpoint))
 
 
-def setup_generators(verbose=False):
-    val_gen = ListGenerator(data_list=config.data_list)
-    val_epoch_size = val_gen.calc_nbatches_per_epoch()
-    return val_gen, val_epoch_size
-
-
-def rel_edist(tr, pred):
-    return editdistance.eval(tr,pred) / float(len(tr))
-
-
 def main():
-    lip_command = evaluate_model()
-    print('lip command: ', lip_command)
+    np.random.seed(config.seed)
+    tf.random.set_seed(config.seed)
+
+    val_g, val_epoch_size, chars, sess, val_gen = init_models_and_data(istrain=0)
+
+    with sess.as_default():
+        pred_sentences, pred_words = predict(sess=sess, g=val_g, n_batches=val_epoch_size, chars=chars, val_gen=val_gen, tb_writer=None)
+
+    return pred_sentences[0], pred_words[0] # Assume batch size is always 1
+
 
 if __name__ == '__main__':
-    main()
+    lip_command, lip_words = main()
+    print('lip command: ', lip_command)
+    print('lip words: ', lip_words)
 
